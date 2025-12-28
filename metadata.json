@@ -1,0 +1,8 @@
+{
+  "name": "Academia Albert",
+  "description": "Uma plataforma educacional completa para desenvolvimento profissional e preparação para exames, com painel administrativo e sistema de certificados.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

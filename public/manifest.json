@@ -1,0 +1,24 @@
+{
+  "short_name": "Academia Albert",
+  "name": "Academia Albert - Moçambique",
+  "description": "Formação profissional de elite em Moçambique.",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3429/3429153.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3429/3429153.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#1e3a8a",
+  "background_color": "#020617"
+}

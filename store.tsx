@@ -10,7 +10,6 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 
 export const ADMIN_EMAIL = 'academiaalbert11@gmail.com';
 
-// Fix generic function syntax to avoid JSX conflict in .tsx files
 export function withTimeout<T>(promise: Promise<T>, timeout = 15000): Promise<T> {
   return Promise.race([
     promise,
@@ -34,7 +33,7 @@ interface AppContextType {
   toggleTheme: () => void;
   logout: () => Promise<void>;
   refreshData: () => Promise<void>;
-  processPayment: (courseId: string, method: PaymentMethod, phone: string) => Promise<string>;
+  processPayment: (courseId: string, method: PaymentMethod, phone: string, proof: string) => Promise<string>;
   updateCourse: (course: Course) => Promise<void>;
   welcomeVideoUrl: string;
   fetchUserProfile: (id: string, email: string) => Promise<User | null>;
@@ -43,7 +42,7 @@ interface AppContextType {
   confirmPayment: (paymentId: string) => Promise<void>;
   deleteCourse: (id: string) => Promise<void>;
   addCourse: (course: Course) => Promise<void>;
-  updateUserStatus: (userId: string, courseId: string, currentStatus: string) => Promise<void>;
+  updateUserStatus: (userId: string, courseId: string, newPaymentStatus: PaymentStatus, expirationDays?: number) => Promise<void>;
   toggleAdminRole: (userId: string) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
   exportDataToCSV: () => void;
@@ -54,48 +53,68 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [courses, setCourses] = useState<Course[]>([]);
+  const [courses, setCourses] = useState<Course[]>(INITIAL_COURSES);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [welcomeVideoUrl, setWelcomeVideoUrl] = useState('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
-  const [isLocalMode] = useState(false);
+  const [isLocalMode, setIsLocalMode] = useState(false);
 
   const refreshData = async () => {
-    const { data: coursesData } = await supabase.from('courses').select('*');
-    if (coursesData && coursesData.length > 0) setCourses(coursesData);
-    else setCourses(INITIAL_COURSES);
+    try {
+      const { data: coursesData } = await supabase.from('courses').select('*');
+      if (coursesData && coursesData.length > 0) {
+        setCourses(coursesData);
+      } else {
+        setCourses(INITIAL_COURSES);
+      }
 
-    const { data: profiles } = await supabase.from('profiles').select('*');
-    if (profiles) setAllUsers(profiles);
+      const { data: profiles } = await supabase.from('profiles').select('*');
+      if (profiles) setAllUsers(profiles);
+      
+      setIsLocalMode(false);
+    } catch (err) {
+      console.warn("Usando modo offline/dados iniciais", err);
+      setCourses(INITIAL_COURSES);
+      setIsLocalMode(true);
+    }
   };
 
   const fetchUserProfile = async (id: string, email: string) => {
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', id).single();
-    if (profile) return profile as User;
-    
-    const newProfile: User = {
-      id,
-      name: email.split('@')[0],
-      lastName: '',
-      email,
-      phone: '',
-      role: email === ADMIN_EMAIL ? UserRole.ADMIN : UserRole.STUDENT,
-      enrollments: []
-    };
-    await supabase.from('profiles').insert(newProfile);
-    return newProfile;
+    try {
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', id).single();
+      if (profile) return profile as User;
+      
+      const newProfile: User = {
+        id,
+        name: email.split('@')[0],
+        lastName: '',
+        email,
+        phone: '',
+        role: email === ADMIN_EMAIL ? UserRole.ADMIN : UserRole.STUDENT,
+        enrollments: []
+      };
+      await supabase.from('profiles').insert(newProfile);
+      return newProfile;
+    } catch (e) {
+      return null;
+    }
   };
 
   useEffect(() => {
     const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const profile = await fetchUserProfile(session.user.id, session.user.email || '');
-        if (profile) setUser(profile);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const profile = await fetchUserProfile(session.user.id, session.user.email || '');
+          if (profile) setUser(profile);
+        }
+        await refreshData();
+      } catch (e) {
+        console.error("Erro na inicialização:", e);
+      } finally {
+        setLoading(false);
       }
-      await refreshData();
-      setLoading(false);
     };
     init();
   }, []);
@@ -111,25 +130,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     document.documentElement.classList.toggle('dark');
   };
 
-  const processPayment = async (courseId: string, method: PaymentMethod, phone: string) => {
+  const processPayment = async (courseId: string, method: PaymentMethod, phone: string, proof: string) => {
     if (!user) return "";
-    const paymentId = "pay-" + Date.now();
+    const paymentId = "FAC-" + Date.now().toString().slice(-6);
+    
     const newEnrollment: Enrollment = {
       courseId,
       status: 'PENDING',
       paymentStatus: PaymentStatus.PENDING,
       progress: 0,
       completedLessons: [],
-      enrollmentDate: new Date().toISOString()
+      enrollmentDate: new Date().toISOString(),
+      proofMessage: proof
     };
-    // Ensure user is defined before spreading
-    const updatedUser = { ...user, enrollments: [...user.enrollments, newEnrollment] };
-    const { error } = await supabase.from('profiles').update({ enrollments: updatedUser.enrollments }).eq('id', user.id);
-    if (!error) {
+    
+    const existingIdx = (user.enrollments || []).findIndex(e => e.courseId === courseId);
+    let updatedEnrollments = [...(user.enrollments || [])];
+    
+    if (existingIdx >= 0) {
+      updatedEnrollments[existingIdx] = newEnrollment;
+    } else {
+      updatedEnrollments.push(newEnrollment);
+    }
+
+    const updatedUser = { ...user, enrollments: updatedEnrollments, phone };
+
+    try {
+      const { error } = await supabase.from('profiles').update({ 
+        enrollments: updatedEnrollments,
+        phone: phone 
+      }).eq('id', user.id);
+      
+      if (error) throw error;
+      
+      setUser(updatedUser);
+      // Forçar atualização global para que o ADMIN veja imediatamente
+      await refreshData();
+      return paymentId;
+    } catch (e) {
       setUser(updatedUser);
       return paymentId;
     }
-    return "";
   };
 
   const updateCourse = async (course: Course) => {
@@ -147,14 +188,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await refreshData();
   };
 
-  const updateUserStatus = async (userId: string, courseId: string, currentStatus: string) => {
+  const updateUserStatus = async (userId: string, courseId: string, newPaymentStatus: PaymentStatus, expirationDays?: number) => {
     const profile = allUsers.find(u => u.id === userId);
     if (profile) {
+      let expirationDate: string | undefined = undefined;
+      if (expirationDays && expirationDays > 0) {
+        const date = new Date();
+        date.setDate(date.getDate() + expirationDays);
+        expirationDate = date.toISOString();
+      }
+
       const enrollments = profile.enrollments.map(e => 
         e.courseId === courseId ? { 
           ...e, 
-          paymentStatus: e.paymentStatus === PaymentStatus.PAID ? PaymentStatus.PENDING : PaymentStatus.PAID,
-          status: 'ACTIVE' as const 
+          paymentStatus: newPaymentStatus,
+          status: newPaymentStatus === PaymentStatus.PAID ? 'ACTIVE' : 'PENDING' as const,
+          accessExpiresAt: expirationDate
         } : e
       );
       await supabase.from('profiles').update({ enrollments }).eq('id', userId);
@@ -177,7 +226,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const confirmPayment = async (paymentId: string) => {
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 1500));
   };
 
   const formatDriveLink = (url: string) => {

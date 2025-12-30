@@ -23,6 +23,8 @@ export interface Enrollment {
   progress: number;
   completedLessons: string[];
   enrollmentDate: string;
+  accessExpiresAt?: string; // Data de expiração do acesso
+  proofMessage?: string;    // Mensagem/Código de transação enviado pelo aluno
 }
 
 export interface Lesson {
@@ -44,14 +46,12 @@ export interface Comment {
   rating?: number;
 }
 
-// Added missing Ebook interface
 export interface Ebook {
   id: string;
   title: string;
   url: string;
 }
 
-// Added missing QuizItem interface
 export interface QuizItem {
   id: string;
   type: 'MULTIPLE_CHOICE' | 'TEXT';
@@ -60,7 +60,6 @@ export interface QuizItem {
   correctIndex: number;
 }
 
-// Added missing FAQItem interface
 export interface FAQItem {
   id: string;
   question: string;
@@ -78,7 +77,6 @@ export interface Course {
   category: string;
   author: string;
   comments: Comment[];
-  // Added optional metadata properties to Course
   ebooks?: Ebook[];
   quiz?: QuizItem[];
   faq?: FAQItem[];
@@ -95,7 +93,6 @@ export interface User {
   enrollments: Enrollment[];
 }
 
-// Added missing Testimonial interface
 export interface Testimonial {
   id: string;
   name: string;

@@ -1,5 +1,5 @@
 
-import { Course, Testimonial } from './types';
+import { Course, Testimonial } from './types.ts';
 
 export const INITIAL_COURSES: Course[] = [
   {

@@ -7,7 +7,7 @@
     <title>Academia Albert - Educação de Elite em Moçambique</title>
     
     <!-- PWA & Mobile Support -->
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" href="./manifest.json" />
     <meta name="theme-color" content="#1e3a8a" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -82,6 +82,24 @@
       }
       .no-scrollbar::-webkit-scrollbar { display: none; }
       main { padding-bottom: env(safe-area-inset-bottom); }
+
+      /* Print Styles for Invoice */
+      @media print {
+        body { background: white !important; color: black !important; padding: 0 !important; margin: 0 !important; }
+        #root > nav, #root > footer, .no-print, .ai-chat-button { display: none !important; }
+        .print-only {
+          display: block !important;
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          padding: 40px !important;
+          margin: 0 !important;
+          visibility: visible !important;
+          background: white !important;
+        }
+        .print-only * { visibility: visible !important; }
+      }
     </style>
     
     <script type="importmap">
@@ -101,6 +119,6 @@
   </head>
   <body class="gradient-mesh text-slate-900 dark:text-white min-h-screen transition-colors duration-500">
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+    <script type="module" src="./index.tsx"></script>
   </body>
 </html>

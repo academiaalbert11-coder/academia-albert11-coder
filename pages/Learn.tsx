@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
-import { useApp } from '../store';
+import React, { useState, useEffect } from 'react';
+import { useApp } from '../store.tsx';
 import { 
-  Play, CheckCircle, FileText, ArrowLeft, Check, Video, BookOpen, Clock, AlertTriangle
+  Play, CheckCircle, FileText, ArrowLeft, Check, Video, BookOpen, Clock, AlertTriangle, Lock
 } from 'lucide-react';
 
 const Learn: React.FC<{ courseId: string; onNavigate: (page: string, params?: any) => void }> = ({ courseId, onNavigate }) => {
@@ -12,7 +12,26 @@ const Learn: React.FC<{ courseId: string; onNavigate: (page: string, params?: an
   const course = courses.find(c => c.id === courseId);
   const enrollment = user?.enrollments.find(e => e.courseId === courseId);
 
+  // Verificação de expiração
+  const isExpired = enrollment?.accessExpiresAt ? new Date(enrollment.accessExpiresAt) < new Date() : false;
+
   if (!course || !enrollment || !user) return <div className="h-screen flex items-center justify-center font-black text-slate-400">CARREGANDO CONTEÚDO...</div>;
+
+  if (isExpired) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 dark:bg-slate-950">
+        <div className="max-w-md w-full bg-white dark:bg-slate-800 p-12 rounded-[3rem] shadow-2xl text-center space-y-6 border-4 border-amber-500/20">
+           <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-[1.5rem] flex items-center justify-center mx-auto">
+              <Clock size={40}/>
+           </div>
+           <h2 className="text-3xl font-black">Acesso Expirado</h2>
+           <p className="text-slate-500 font-medium">O seu tempo de acesso a este curso terminou no dia <b>{new Date(enrollment.accessExpiresAt!).toLocaleDateString()}</b>. Por favor, efectue um novo pagamento.</p>
+           <button onClick={() => onNavigate('checkout', {id: course.id})} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black">Renovar Acesso</button>
+           <button onClick={() => onNavigate('dashboard')} className="w-full text-slate-400 font-bold text-sm">Voltar ao Painel</button>
+        </div>
+      </div>
+    );
+  }
 
   if (enrollment.status === 'PENDING') {
     return (
@@ -21,30 +40,15 @@ const Learn: React.FC<{ courseId: string; onNavigate: (page: string, params?: an
            <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-[1.5rem] flex items-center justify-center mx-auto animate-pulse">
               <Clock size={40}/>
            </div>
-           <h2 className="text-3xl font-black">Inscrição Pendente</h2>
-           <p className="text-slate-500 font-medium leading-relaxed">Sua matrícula para <b>{course.title}</b> foi registada! Um administrador em Moçambique precisa validar seu acesso manual agora.</p>
-           <button onClick={() => onNavigate('dashboard')} className="w-full py-4 bg-slate-900 dark:bg-slate-700 text-white rounded-2xl font-black hover:scale-105 transition-all">Voltar ao Painel</button>
+           <h2 className="text-3xl font-black">Aguardando Validação</h2>
+           <p className="text-slate-500 font-medium leading-relaxed">Enviou o comprovativo de transação para <b>{course.title}</b>. A Academia Albert está a processar a sua matrícula manualmente agora.</p>
+           <button onClick={() => onNavigate('dashboard')} className="w-full py-4 bg-slate-900 dark:bg-slate-700 text-white rounded-2xl font-black hover:scale-105 transition-all">Ir para Painel</button>
         </div>
       </div>
     );
   }
 
-  if (enrollment.status === 'BLOCKED') {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 dark:bg-slate-950">
-        <div className="max-w-md w-full bg-white dark:bg-slate-800 p-12 rounded-[3rem] shadow-2xl text-center space-y-6 border-4 border-red-500/20">
-           <div className="w-20 h-20 bg-red-100 text-red-600 rounded-[1.5rem] flex items-center justify-center mx-auto">
-              <AlertTriangle size={40}/>
-           </div>
-           <h2 className="text-3xl font-black">Acesso Suspenso</h2>
-           <p className="text-slate-500 font-medium">Lamentamos, mas o acesso a este conteúdo foi bloqueado. Entre em contacto com a secretaria da Academia Albert.</p>
-           <button onClick={() => onNavigate('dashboard')} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black">Voltar ao Painel</button>
-        </div>
-      </div>
-    );
-  }
-
-  const currentLesson = course.lessons[currentLessonIndex] || { title: 'Nenhuma Lição', videoUrl: '', pdfUrl: '', richText: '', id: 'none' };
+  const currentLesson = course.lessons[currentLessonIndex] || { title: 'Nenhuma Lição', id: 'none' };
 
   const markComplete = () => {
     if (enrollment.completedLessons.includes(currentLesson.id)) return;
@@ -65,9 +69,14 @@ const Learn: React.FC<{ courseId: string; onNavigate: (page: string, params?: an
               <ArrowLeft size={14}/> Dashboard
            </button>
            <h2 className="font-black text-xl leading-tight mb-4 text-slate-800 dark:text-white">{course.title}</h2>
-           <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-2"><div className="h-full bg-indigo-600 transition-all duration-1000 shadow-[0_0_15px_rgba(79,70,229,0.4)]" style={{width: `${enrollment.progress}%`}}></div></div>
+           {enrollment.accessExpiresAt && (
+             <div className="text-[9px] font-black text-amber-600 uppercase mb-3 bg-amber-50 dark:bg-amber-900/20 p-2 rounded-lg text-center border border-amber-100">
+               Expira em: {new Date(enrollment.accessExpiresAt).toLocaleDateString()}
+             </div>
+           )}
+           <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-2"><div className="h-full bg-indigo-600 transition-all duration-1000" style={{width: `${enrollment.progress}%`}}></div></div>
            <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-tighter">
-              <span>Progresso de Estudo</span>
+              <span>Progresso</span>
               <span className="text-indigo-600">{enrollment.progress}%</span>
            </div>
         </div>
@@ -80,7 +89,7 @@ const Learn: React.FC<{ courseId: string; onNavigate: (page: string, params?: an
                 </div>
                 <div className="flex-grow min-w-0">
                   <div className="font-black text-sm truncate">{l.title}</div>
-                  <div className={`text-[10px] font-bold uppercase opacity-60 ${currentLessonIndex === i ? 'text-white' : 'text-slate-400'}`}>Módulo {i+1}</div>
+                  <div className={`text-[10px] font-bold uppercase opacity-60 ${currentLessonIndex === i ? 'text-white' : 'text-slate-400'}`}>Aula {i+1}</div>
                 </div>
              </button>
            ))}
@@ -91,21 +100,17 @@ const Learn: React.FC<{ courseId: string; onNavigate: (page: string, params?: an
         <div className="max-w-5xl mx-auto space-y-12 pb-40">
            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white dark:bg-slate-800 p-8 rounded-[3rem] shadow-sm border border-slate-100 dark:border-slate-700">
               <div className="space-y-1">
-                <div className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Estás a ver:</div>
+                <div className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Módulo em Estudo:</div>
                 <h1 className="text-4xl font-black text-slate-900 dark:text-white leading-tight">{currentLesson.title}</h1>
               </div>
-              <button onClick={markComplete} className={`px-10 py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-3 active:scale-95 ${enrollment.completedLessons.includes(currentLesson.id) ? 'bg-green-100 text-green-700 border-2 border-green-200' : 'bg-indigo-600 text-white shadow-xl hover:bg-indigo-700'}`}>
+              <button onClick={markComplete} className={`px-10 py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-3 active:scale-95 ${enrollment.completedLessons.includes(currentLesson.id) ? 'bg-green-100 text-green-700' : 'bg-indigo-600 text-white'}`}>
                 {enrollment.completedLessons.includes(currentLesson.id) ? <CheckCircle size={22}/> : <Play size={22}/>}
-                {enrollment.completedLessons.includes(currentLesson.id) ? 'Concluída' : 'Marcar como Concluída'}
+                {enrollment.completedLessons.includes(currentLesson.id) ? 'Concluída' : 'Marcar Aula'}
               </button>
            </div>
 
-           {/* Módulo de Vídeo */}
            {currentLesson.videoUrl && (
              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-xs font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 dark:bg-indigo-900/20 w-fit px-4 py-1.5 rounded-full border border-indigo-100 dark:border-indigo-800">
-                   <Video size={14}/> Aula em Vídeo
-                </div>
                 <div className="aspect-video bg-black rounded-[3.5rem] overflow-hidden shadow-2xl border-[10px] border-white dark:border-slate-800">
                    <iframe 
                       width="100%" height="100%" 
@@ -116,28 +121,16 @@ const Learn: React.FC<{ courseId: string; onNavigate: (page: string, params?: an
              </div>
            )}
 
-           {/* Módulo de Texto Rico */}
            {currentLesson.richText && (
-             <div className="space-y-4">
-                <div className="flex items-center gap-2 text-xs font-black text-emerald-500 uppercase tracking-widest bg-emerald-50 dark:bg-emerald-900/20 w-fit px-4 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-800">
-                   <BookOpen size={14}/> Material de Estudo
-                </div>
-                <div className="bg-white dark:bg-slate-800 p-12 lg:p-20 rounded-[4rem] shadow-sm border border-slate-100 dark:border-slate-700">
-                   <div dangerouslySetInnerHTML={{ __html: currentLesson.richText }} className="text-xl leading-relaxed text-slate-700 dark:text-slate-300 font-medium prose dark:prose-invert max-w-none" />
-                </div>
+             <div className="bg-white dark:bg-slate-800 p-12 lg:p-20 rounded-[4rem] shadow-sm border border-slate-100 dark:border-slate-700">
+                <div dangerouslySetInnerHTML={{ __html: currentLesson.richText }} className="text-xl leading-relaxed text-slate-700 dark:text-slate-300 font-medium prose dark:prose-invert max-w-none" />
              </div>
            )}
 
-           {/* Módulo de PDF */}
            {currentLesson.pdfUrl && (
-             <div className="space-y-4">
-                <div className="flex items-center gap-2 text-xs font-black text-red-500 uppercase tracking-widest bg-red-50 dark:bg-red-900/20 w-fit px-4 py-1.5 rounded-full border border-red-100 dark:border-red-800">
-                   <FileText size={14}/> Guia em PDF / Download
-                </div>
-                <div className="w-full h-[800px] bg-slate-100 dark:bg-slate-900 rounded-[3.5rem] overflow-hidden border-[10px] border-white dark:border-slate-800 shadow-xl relative">
-                   <iframe src={formatDriveLink(currentLesson.pdfUrl)} className="w-full h-full" />
-                   <a href={currentLesson.pdfUrl} target="_blank" rel="noreferrer" className="absolute bottom-6 right-6 p-4 bg-indigo-600 text-white rounded-2xl shadow-2xl hover:scale-110 transition-transform"><FileText size={24}/></a>
-                </div>
+             <div className="w-full h-[800px] bg-slate-100 dark:bg-slate-900 rounded-[3.5rem] overflow-hidden border-[10px] border-white dark:border-slate-800 shadow-xl relative">
+                <iframe src={formatDriveLink(currentLesson.pdfUrl)} className="w-full h-full" />
+                <a href={currentLesson.pdfUrl} target="_blank" rel="noreferrer" className="absolute bottom-6 right-6 p-4 bg-indigo-600 text-white rounded-2xl"><FileText size={24}/></a>
              </div>
            )}
         </div>
